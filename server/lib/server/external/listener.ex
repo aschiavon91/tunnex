@@ -1,7 +1,5 @@
 defmodule Server.External.Listener do
-  @moduledoc """
-  外部监听
-  """
+  @moduledoc false
 
   require Logger
   use GenServer
