@@ -1,9 +1,10 @@
-defmodule Server.Stores.Supervisor do
+defmodule Server.StoresSupervisor do
   @moduledoc false
 
   use Supervisor
 
-  alias Server.Stores.{IPSocket, Socket}
+  alias Server.External.SocketStore, as: ExternalSocketStore
+  alias Server.Internal.SocketStore, as: InternalSocketStore
 
   def start_link(_) do
     Supervisor.start_link(__MODULE__, :ok, name: __MODULE__)
@@ -12,8 +13,8 @@ defmodule Server.Stores.Supervisor do
   @impl true
   def init(:ok) do
     children = [
-      IPSocket,
-      Socket
+      InternalSocketStore,
+      ExternalSocketStore
     ]
 
     Supervisor.init(children, strategy: :one_for_one)

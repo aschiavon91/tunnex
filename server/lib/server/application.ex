@@ -6,7 +6,7 @@ defmodule Server.Application do
   alias Server.External.Stater, as: ExternalStater
   alias Server.External.Supervisor, as: ExternalSupervisor
   alias Server.Internal.Supervisor, as: InternalSupervisor
-  alias Server.Stores.Supervisor, as: StoresSupervisor
+  alias Server.StoresSupervisor
 
   @impl true
   def start(_type, _args) do

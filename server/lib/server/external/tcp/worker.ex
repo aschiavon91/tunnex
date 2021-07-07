@@ -4,7 +4,8 @@ defmodule Server.External.Tcp.Worker do
   use GenServer
 
   alias Server.Internal.Tcp.Worker, as: InternalWorker
-  alias Server.Stores.{IPSocket, Socket}
+  alias Server.External.SocketStore, as: ExternalSocketStore
+  alias Server.Internal.SocketStore, as: InternalSocketStore
 
   require Logger
 
@@ -114,11 +115,11 @@ defmodule Server.External.Tcp.Worker do
     # Cleanup whatever you need cleaned up
 
     send_msg(client_ip, <<0x09, 0x04, key::16>>)
-    Socket.rm_socket(key)
+    ExternalSocketStore.rm_socket(key)
   end
 
   defp send_msg(ip, msg) do
-    case IPSocket.get_socket(ip) do
+    case InternalSocketStore.get_socket(ip) do
       {:ok, socket} ->
         InternalWorker.send_message(socket, msg)
 

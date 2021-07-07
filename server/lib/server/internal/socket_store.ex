@@ -1,4 +1,4 @@
-defmodule Server.Stores.IPSocket do
+defmodule Server.Internal.SocketStore do
   use GenServer
 
   require Logger

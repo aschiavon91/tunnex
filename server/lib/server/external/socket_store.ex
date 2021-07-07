@@ -1,4 +1,4 @@
-defmodule Server.Stores.Socket do
+defmodule Server.External.SocketStore do
   @moduledoc false
 
   use GenServer

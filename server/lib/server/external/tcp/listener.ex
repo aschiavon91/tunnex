@@ -4,7 +4,7 @@ defmodule Server.External.Tcp.Listener do
   use GenServer
 
   alias Server.External.Tcp.Worker
-  alias Server.Stores.Socket
+  alias Server.External.SocketStore
   alias Server.Utils
 
   require Logger
@@ -37,7 +37,7 @@ defmodule Server.External.Tcp.Listener do
     {:ok, pid} = GenServer.start_link(Worker, {sock, to, sock_key})
     :gen_tcp.controlling_process(sock, pid)
 
-    Socket.add_socket(sock_key, pid)
+    SocketStore.add_socket(sock_key, pid)
 
     send(self(), :accept)
     {:noreply, state}

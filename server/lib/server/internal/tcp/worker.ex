@@ -4,7 +4,8 @@ defmodule Server.Internal.Tcp.Worker do
   use GenServer
 
   alias Server.External.Tcp.Worker, as: ExternalTcpWorker
-  alias Server.Stores.{IPSocket, Socket}
+  alias Server.External.SocketStore, as: ExternalSocketStore
+  alias Server.Internal.SocketStore, as: InternalSocketStore
 
   require Logger
 
@@ -30,7 +31,7 @@ defmodule Server.Internal.Tcp.Worker do
   @impl true
   def handle_info({:tcp, socket, <<0x09::8, 0x01::8, ip::32>> = data}, state) do
     Logger.info("#{__MODULE__} internal recv => #{inspect(data)}")
-    IPSocket.add_socket(<<ip::32>>, self())
+    InternalSocketStore.add_socket(<<ip::32>>, self())
     # handshake
     :gen_tcp.send(socket, <<0x09, 0x02>>)
     {:noreply, Map.put(state, :ip, <<ip::32>>)}
@@ -38,7 +39,7 @@ defmodule Server.Internal.Tcp.Worker do
 
   @impl true
   def handle_info({:tcp, _socket, <<0x09::8, 0x03::8, key::16>>}, state) do
-    case Socket.get_socket(key) do
+    case ExternalSocketStore.get_socket(key) do
       {:error, :not_found} ->
         Logger.warn("#{__MODULE__}.handle_info no external socket")
 
@@ -51,7 +52,7 @@ defmodule Server.Internal.Tcp.Worker do
 
   @impl true
   def handle_info({:tcp, _socket, <<0x08::8, 0x01::8, key::16>>}, state) do
-    case Socket.get_socket(key) do
+    case ExternalSocketStore.get_socket(key) do
       {:error, :not_found} ->
         Logger.warn("#{__MODULE__}.handle_info no external socket")
 
@@ -66,7 +67,7 @@ defmodule Server.Internal.Tcp.Worker do
   def handle_info({:tcp, _socket, <<key::16, real_data::binary>> = data}, state) do
     Logger.info("#{__MODULE__} internal recv: #{inspect(data)}")
 
-    case Socket.get_socket(key) do
+    case ExternalSocketStore.get_socket(key) do
       {:error, :not_found} ->
         Logger.warn("#{__MODULE__}.handle_info no external socket")
 
@@ -92,6 +93,6 @@ defmodule Server.Internal.Tcp.Worker do
   end
 
   defp cleanup(_reason, state) do
-    IPSocket.rm_socket(state.ip)
+    InternalSocketStore.rm_socket(state.ip)
   end
 end
