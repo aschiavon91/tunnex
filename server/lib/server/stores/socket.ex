@@ -1,21 +1,66 @@
 defmodule Server.Stores.Socket do
-  use Agent
+  @moduledoc false
+
+  use GenServer
+
+  require Logger
 
   def start_link(_opts) do
-    Agent.start_link(fn -> %{} end, name: __MODULE__)
+    GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
   end
 
-  @spec get_socket(integer()) :: pid()
+  @impl true
+  def init(:ok) do
+    {:ok, %{}}
+  end
+
+  def add_socket(sock_key, pid) do
+    Logger.debug("#{__MODULE__}.add_socket #{inspect(sock_key)} => #{inspect(pid)}")
+    GenServer.cast(__MODULE__, {:add_socket, sock_key, pid})
+  end
+
+  def rm_socket(sock_key) do
+    Logger.debug("#{__MODULE__}.rm_socket #{inspect(sock_key)}")
+    GenServer.cast(__MODULE__, {:rm_socket, sock_key})
+  end
+
   def get_socket(sock_key) do
-    __MODULE__
-    |> Agent.get(& &1)
-    |> Map.get(sock_key)
+    Logger.debug("#{__MODULE__}.get_socket #{inspect(sock_key)}")
+    GenServer.call(__MODULE__, {:get_socket, sock_key})
   end
 
-  @spec add_socket(integer(), pid()) :: :ok
-  def add_socket(sock_key, pid),
-    do: Agent.update(__MODULE__, fn x -> Map.put(x, sock_key, pid) end)
+  def list_sockets() do
+    Logger.debug("#{__MODULE__}.list_sockets")
+    GenServer.call(__MODULE__, :list_sockets)
+  end
 
-  @spec rm_socket(integer()) :: :ok
-  def rm_socket(sock_key), do: Agent.update(__MODULE__, fn x -> Map.delete(x, sock_key) end)
+  @impl true
+  def handle_cast({:add_socket, sock_key, pid}, state) do
+    state = Map.update(state, sock_key, [pid], &[pid | &1])
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({:rm_socket, sock_key}, state) do
+    state = Map.delete(state, sock_key)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_call({:get_socket, sock_key}, _from, state) do
+    state
+    |> Map.get(sock_key)
+    |> case do
+      nil ->
+        {:reply, {:error, :ip_socket_not_found}, state}
+
+      socket ->
+        {:reply, {:ok, socket}, state}
+    end
+  end
+
+  @impl true
+  def handle_call(:list_sockets, _from, state) do
+    {:reply, state, state}
+  end
 end

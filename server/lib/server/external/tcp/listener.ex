@@ -1,35 +1,40 @@
-defmodule Server.External.Listener do
+defmodule Server.External.Tcp.Listener do
   @moduledoc false
 
-  require Logger
   use GenServer
-  alias Server.External.Worker
+
+  alias Server.External.Tcp.Worker
   alias Server.Stores.Socket
   alias Server.Utils
 
+  require Logger
+
   def start_link(opts) do
     {name, opts} = Keyword.pop(opts, :name, __MODULE__)
+    name = String.to_atom("#{__MODULE__}/#{name}")
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
-  def init(nat: nat) do
-    [_, port_str] = nat |> Map.get(:from) |> String.split(":")
+  @impl true
+  def init(from: from, to: to) do
+    [_, port_str] = String.split(from, ":")
     port = String.to_integer(port_str)
 
     {:ok, acceptor} = :gen_tcp.listen(port, [:binary, active: false, reuseaddr: true])
     send(self(), :accept)
-    Logger.info("Accepting connection on port #{port}")
+    Logger.info("#{__MODULE__} accepting connection on port #{port}")
 
-    {:ok, %{acceptor: acceptor, nat: nat, port: port}}
+    {:ok, %{acceptor: acceptor, to: to, port: port}}
   end
 
-  def handle_info(:accept, %{acceptor: acceptor, port: port, nat: nat} = state) do
+  @impl true
+  def handle_info(:accept, %{acceptor: acceptor, port: port, to: to} = state) do
     {:ok, sock} = :gen_tcp.accept(acceptor)
-    Logger.info("new connection established from port #{port}")
+    Logger.info("#{__MODULE__} new connection established from port #{port}")
 
     sock_key = Utils.generete_socket_key()
 
-    {:ok, pid} = GenServer.start_link(Worker, {sock, nat, sock_key})
+    {:ok, pid} = GenServer.start_link(Worker, {sock, to, sock_key})
     :gen_tcp.controlling_process(sock, pid)
 
     Socket.add_socket(sock_key, pid)
@@ -38,6 +43,7 @@ defmodule Server.External.Listener do
     {:noreply, state}
   end
 
+  @impl true
   def handle_info(_, state) do
     {:noreply, state}
   end

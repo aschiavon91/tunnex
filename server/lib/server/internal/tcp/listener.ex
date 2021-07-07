@@ -1,14 +1,17 @@
-defmodule Server.Internal.Listener do
-  require Logger
+defmodule Server.Internal.Tcp.Listener do
+  @moduledoc false
 
   use GenServer
 
-  alias Server.Internal.Worker
+  alias Server.Internal.Tcp.Worker
+
+  require Logger
 
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, [], name:  Keyword.get(opts, :name))
+    GenServer.start_link(__MODULE__, [], name: Keyword.get(opts, :name))
   end
 
+  @impl true
   def init(_opts) do
     port = server_port()
     {:ok, acceptor} = :gen_tcp.listen(port, [:binary, active: false, reuseaddr: true, packet: 2])
@@ -18,6 +21,7 @@ defmodule Server.Internal.Listener do
     {:ok, %{acceptor: acceptor}}
   end
 
+  @impl true
   def handle_info(:accept, %{acceptor: acceptor} = state) do
     {:ok, sock} = :gen_tcp.accept(acceptor)
 
@@ -29,6 +33,7 @@ defmodule Server.Internal.Listener do
     {:noreply, state}
   end
 
+  @impl true
   def handle_info(_, state) do
     {:noreply, state}
   end

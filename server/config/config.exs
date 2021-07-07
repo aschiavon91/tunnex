@@ -1,7 +1,7 @@
 import Config
 
 config :server,
-  port: 22234,
+  port: 22_234,
   nat: [
     %{
       name: "server0",
@@ -15,6 +15,4 @@ config :server,
     }
   ]
 
-config :logger, :console,
-  format: "\n[$time][$level] $message $metadata\n",
-  metadata: [:file]
+config :logger, level: :debug

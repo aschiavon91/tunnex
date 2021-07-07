@@ -1,8 +1,10 @@
-defmodule Server.External.Worker do
+defmodule Server.External.Tcp.Worker do
+  @moduledoc false
+
   use GenServer
 
-  alias Server.Stores.{Socket, IPSocket}
-  alias Server.Internal.Worker, as: InternalWorker
+  alias Server.Internal.Tcp.Worker, as: InternalWorker
+  alias Server.Stores.{IPSocket, Socket}
 
   require Logger
 
@@ -12,12 +14,9 @@ defmodule Server.External.Worker do
 
   def send_message(pid, message), do: GenServer.cast(pid, {:message, message})
 
-  @spec init({pid(), map(), integer()}) :: {:ok, pid()}
-  def init({socket, nat, key}) do
-    [client_ip_raw, client_port] =
-      nat
-      |> Map.get(:to)
-      |> String.split(":")
+  @impl true
+  def init({socket, to, key}) do
+    [client_ip_raw, client_port] = String.split(to, ":")
 
     {:ok, {ip0, ip1, ip2, ip3}} = client_ip_raw |> to_charlist() |> :inet.parse_address()
 
@@ -35,13 +34,18 @@ defmodule Server.External.Worker do
      }}
   end
 
-  def handle_info(:tcp_connection_req, state) do
-    Logger.info("send tcp connecntion request")
+  @impl true
+  def handle_info(
+        :tcp_connection_req,
+        %{client_ip: client_ip, client_port: client_port, key: key, socket: socket} = state
+      ) do
+    Logger.info("#{__MODULE__} send tcp connecntion request")
 
-    send_msg(state.client_ip, <<0x09, 0x03, state.key::16, state.client_port::16>>)
+    client_ip
+    |> send_msg(<<0x09, 0x03, key::16, client_port::16>>)
     |> case do
       :ok ->
-        :inet.setopts(state.socket, active: true)
+        :inet.setopts(socket, active: true)
         {:noreply, Map.put(state, :status, 1)}
 
       _ ->
@@ -50,10 +54,11 @@ defmodule Server.External.Worker do
     end
   end
 
-  def handle_info(:tcp_connection_set, state) do
-    Logger.info("recv tcp connecntion finished")
+  @impl true
+  def handle_info(:tcp_connection_set, %{buffer: buffer, key: key, client_ip: client_ip} = state) do
+    Logger.info("#{__MODULE__} recv tcp connecntion finished")
 
-    flush_buffer(state.buffer, state.key, state.client_ip)
+    flush_buffer(buffer, key, client_ip)
 
     new_state =
       state
@@ -63,52 +68,60 @@ defmodule Server.External.Worker do
     {:noreply, new_state}
   end
 
+  @impl true
   def handle_info({:tcp_closed, _}, state), do: {:stop, :normal, state}
+
+  @impl true
   def handle_info({:tcp_error, _}, state), do: {:stop, :normal, state}
 
-  def handle_info({:tcp, _, data}, state) do
-    Logger.info("external recv => #{inspect(data)}")
+  @impl true
+  def handle_info(
+        {:tcp, _, data},
+        %{status: status, client_ip: client_ip, key: key, buffer: buffer} = state
+      ) do
+    Logger.info("#{__MODULE__} external recv: #{inspect(data)}")
 
     new_state =
-      case state.status do
+      case status do
         2 ->
           # already set
-          :ok = send_msg(state.client_ip, <<state.key::16>> <> data)
+          :ok = send_msg(client_ip, <<key::16>> <> data)
           state
 
         _ ->
           # not set, go to buffer
-          Map.put(state, :buffer, :queue.in(data, state.buffer))
+          Map.put(state, :buffer, :queue.in(data, buffer))
       end
 
     {:noreply, new_state}
   end
 
-  def handle_cast({:message, message}, state) do
-    Logger.debug("external send: #{inspect(message)}")
-    :gen_tcp.send(state.socket, message)
+  @impl true
+  def handle_cast({:message, message}, %{socket: socket} = state) do
+    Logger.debug("#{__MODULE__} external send: #{inspect(message)}")
+    :gen_tcp.send(socket, message)
     {:noreply, state}
   end
 
-  # handle termination
+  @impl true
   def terminate(reason, state) do
-    Logger.info("terminating")
+    Logger.info("#{__MODULE__} terminating")
     cleanup(reason, state)
     state
   end
 
-  defp cleanup(_reason, state) do
+  defp cleanup(_reason, %{client_ip: client_ip, key: key}) do
     # Cleanup whatever you need cleaned up
 
-    send_msg(state.client_ip, <<0x09, 0x04, state.key::16>>)
-    Socket.rm_socket(state.key)
+    send_msg(client_ip, <<0x09, 0x04, key::16>>)
+    Socket.rm_socket(key)
   end
 
   defp send_msg(ip, msg) do
     case IPSocket.get_socket(ip) do
       nil ->
-        Logger.warn("no socket avaiable")
-        {:error, "no socket avaiable"}
+        Logger.warn("#{__MODULE__} no socket avaiable")
+        {:error, :no_socket_available}
 
       pid ->
         InternalWorker.send_message(pid, msg)
