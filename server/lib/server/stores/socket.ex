@@ -36,7 +36,7 @@ defmodule Server.Stores.Socket do
 
   @impl true
   def handle_cast({:add_socket, sock_key, pid}, state) do
-    state = Map.update(state, sock_key, [pid], &[pid | &1])
+    state = Map.put(state, sock_key, pid)
     {:noreply, state}
   end
 
@@ -52,7 +52,7 @@ defmodule Server.Stores.Socket do
     |> Map.get(sock_key)
     |> case do
       nil ->
-        {:reply, {:error, :ip_socket_not_found}, state}
+        {:reply, {:error, :not_found}, state}
 
       socket ->
         {:reply, {:ok, socket}, state}

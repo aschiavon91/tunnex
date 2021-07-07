@@ -39,7 +39,7 @@ defmodule Server.External.Tcp.Worker do
         :tcp_connection_req,
         %{client_ip: client_ip, client_port: client_port, key: key, socket: socket} = state
       ) do
-    Logger.info("#{__MODULE__} send tcp connecntion request")
+    Logger.info("#{__MODULE__} send tcp connection request")
 
     client_ip
     |> send_msg(<<0x09, 0x03, key::16, client_port::16>>)
@@ -56,7 +56,7 @@ defmodule Server.External.Tcp.Worker do
 
   @impl true
   def handle_info(:tcp_connection_set, %{buffer: buffer, key: key, client_ip: client_ip} = state) do
-    Logger.info("#{__MODULE__} recv tcp connecntion finished")
+    Logger.info("#{__MODULE__} recv tcp connection finished")
 
     flush_buffer(buffer, key, client_ip)
 
@@ -119,12 +119,11 @@ defmodule Server.External.Tcp.Worker do
 
   defp send_msg(ip, msg) do
     case IPSocket.get_socket(ip) do
-      nil ->
-        Logger.warn("#{__MODULE__} no socket avaiable")
-        {:error, :no_socket_available}
+      {:ok, socket} ->
+        InternalWorker.send_message(socket, msg)
 
-      pid ->
-        InternalWorker.send_message(pid, msg)
+      {:error, _} ->
+        Logger.warn("#{__MODULE__}.send_msg no internal socket found")
     end
   end
 

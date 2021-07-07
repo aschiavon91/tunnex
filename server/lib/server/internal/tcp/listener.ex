@@ -8,11 +8,12 @@ defmodule Server.Internal.Tcp.Listener do
   require Logger
 
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, [], name: Keyword.get(opts, :name))
+    {name, _} = Keyword.pop(opts, :name, __MODULE__)
+    GenServer.start_link(__MODULE__, :ok, name: name)
   end
 
   @impl true
-  def init(_opts) do
+  def init(:ok) do
     port = server_port()
     {:ok, acceptor} = :gen_tcp.listen(port, [:binary, active: false, reuseaddr: true, packet: 2])
     send(self(), :accept)

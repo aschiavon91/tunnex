@@ -50,10 +50,10 @@ defmodule Server.Stores.IPSocket do
     |> Map.get(ip)
     |> case do
       nil ->
-        {:reply, {:error, :socket_not_found}, state}
+        {:reply, {:error, :not_found}, state}
 
-      socket ->
-        {:reply, {:ok, socket}, state}
+      sockets ->
+        {:reply, {:ok, Enum.random(sockets)}, state}
     end
   end
 

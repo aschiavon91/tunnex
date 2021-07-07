@@ -39,10 +39,10 @@ defmodule Server.Internal.Tcp.Worker do
   @impl true
   def handle_info({:tcp, _socket, <<0x09::8, 0x03::8, key::16>>}, state) do
     case Socket.get_socket(key) do
-      nil ->
-        Logger.warn("#{__MODULE__} no external socket")
+      {:error, :not_found} ->
+        Logger.warn("#{__MODULE__}.handle_info no external socket")
 
-      pid ->
+      {:ok, pid} ->
         send(pid, :tcp_connection_set)
     end
 
@@ -52,10 +52,10 @@ defmodule Server.Internal.Tcp.Worker do
   @impl true
   def handle_info({:tcp, _socket, <<0x08::8, 0x01::8, key::16>>}, state) do
     case Socket.get_socket(key) do
-      nil ->
-        Logger.warn("#{__MODULE__} no external socket")
+      {:error, :not_found} ->
+        Logger.warn("#{__MODULE__}.handle_info no external socket")
 
-      pid ->
+      {:ok, pid} ->
         send(pid, {:tcp_error, :key_error})
     end
 
@@ -64,13 +64,13 @@ defmodule Server.Internal.Tcp.Worker do
 
   @impl true
   def handle_info({:tcp, _socket, <<key::16, real_data::binary>> = data}, state) do
-    Logger.info("#{__MODULE__} internal recv => #{inspect(data)}")
+    Logger.info("#{__MODULE__} internal recv: #{inspect(data)}")
 
     case Socket.get_socket(key) do
-      nil ->
-        Logger.warn("#{__MODULE__} no external socket")
+      {:error, :not_found} ->
+        Logger.warn("#{__MODULE__}.handle_info no external socket")
 
-      pid ->
+      {:ok, pid} ->
         ExternalTcpWorker.send_message(pid, <<real_data::binary>>)
     end
 
